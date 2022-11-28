@@ -29,9 +29,14 @@ async def genres_(message: types.Message):
     await delete_mes_id_from_del_mes(user_id=user_id)
     await delete_message(mes_del)
     all_tracks = await get_all_user_tracks(await get_user_id_from_tg_id(message.from_user.id))
-    reference_point_tracks = len(all_tracks)
-    for track_id in all_tracks:
-        track_id = track_id[0]
+    all_tracks = all_tracks[::-1]
+    reference_point_tracks = 0
+    if reference_point_tracks + 10 >= len(all_tracks):
+        before = len(all_tracks)
+    else:
+        before = reference_point_tracks + 10
+    for track_ind in range(reference_point_tracks, before):
+        track_id = all_tracks[track_ind][0]
         all_info = await get_music_info(track_id)
         message_text = f"""***Название:*** `{all_info[1].replace('`', "'")}`
 ***Исполнитель:*** `{all_info[2].replace('`', "'")}`
@@ -56,20 +61,7 @@ async def genres_(message: types.Message):
 
 
 # если выбрали все треки за раз
-async def all_tracks_of_profile(call: types.CallbackQuery, reference_point_tracks=0, flag=False, **kwargs):
-    if flag is False or flag == 'False':
-        # удаление старых отправленных треков
-        await call.message.edit_text('📤 Загружаю')
-        user_id = await get_user_id_from_tg_id(call.from_user.id)
-        mess_id = await return_all_ids_mes_for_delete(user_id=user_id)
-        for i in mess_id:
-            try:
-                await bot.delete_message(message_id=i[0], chat_id=call.message.chat.id)
-            except aiogram.utils.exceptions.MessageToDeleteNotFound:
-                pass
-            except aiogram.utils.exceptions.MessageCantBeDeleted:
-                pass
-        await delete_mes_id_from_del_mes(user_id=user_id)
+async def all_tracks_of_profile(call: types.CallbackQuery, reference_point_tracks=10, flag=False, **kwargs):
     await delete_message(call.message)
     all_tracks = await get_all_user_tracks(await get_user_id_from_tg_id(call.from_user.id))
     all_tracks = all_tracks[::-1]
@@ -95,7 +87,7 @@ async def all_tracks_of_profile(call: types.CallbackQuery, reference_point_track
     if reference_point_tracks + 10 < len(all_tracks):
         await call.message.answer(text='Для просмотра других треков нажмите "Ещё треки"',
                                   reply_markup=(
-                                      await all_tracks_profile(reference_point_tracks=reference_point_tracks)))
+                                      await all_tracks_profile(reference_point_tracks=reference_point_tracks + 10)))
     else:
         await call.message.answer(text=emojize(string=":white_exclamation_mark: Песен больше нет!",
                                                language='alias'),
