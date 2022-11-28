@@ -8,7 +8,8 @@ from keyboards.default.start import start_menu
 from keyboards.inline.music_genres_menu import genres_keyboard
 from loader import dp
 from states.add_music import AddMusic
-from utils.db_func import name_of_genre, add_music, get_user_id_from_tg_id
+from utils.db_func import name_of_genre, add_music, get_user_id_from_tg_id, get_music_id, get_music_info, \
+    add_gener_duration_file_id_to_music
 
 
 @dp.message_handler(commands=['cancel'], state=AddMusic)
@@ -31,9 +32,12 @@ async def add_(message: types.Message):
 async def am_name(message: types.Message, state: FSMContext):
     try:
         name, author = message.text.split('  ')
-        msg = ":pencil: ***Выберите жанр песни или нажмите /cancel для отмены***"
+        await add_music(name=name, author=author, creator_id=await get_user_id_from_tg_id(message.from_user.id))
+        music_id = await get_music_id(name=name, author=author,
+                                      creator_id=await get_user_id_from_tg_id(message.from_user.id))
+        msg = ":pencil: ***Выберите жанр песни***"
         msg = emojize(string=msg, language='alias')
-        markup = await genres_keyboard(search_music=True, author=author, name=name)
+        markup = await genres_keyboard(search_music=True, music_id=music_id)
         await state.reset_state(with_data=False)
         await message.answer(msg, parse_mode=types.ParseMode.MARKDOWN, reply_markup=markup)
     except ValueError:
@@ -42,8 +46,8 @@ async def am_name(message: types.Message, state: FSMContext):
 
 
 # забираем жанр трека
-async def am_genre(call: types.CallbackQuery, state: FSMContext, genre_id, author_tr, name_track, **kwargs):
-    await state.update_data(genre_id=genre_id, author=author_tr, name=name_track)
+async def am_genre(call: types.CallbackQuery, state: FSMContext, music_id, genre_id, **kwargs):
+    await state.update_data(music_id=music_id, genre_id=genre_id)
     msg = ":pencil: ***Отправьте файл песни или нажмите /cancel для отмены***"
     msg = emojize(string=msg, language='alias')
     await call.message.edit_text(msg, parse_mode=types.ParseMode.MARKDOWN)
@@ -60,13 +64,15 @@ async def am_file(message: types.Message, state: FSMContext):
         ]
     )
     data = await state.get_data()
+    music_info = await get_music_info(music_id=data.get('music_id'))
     await message.answer(text=f"""Проверьте данные:
-Название: {data.get('name')}
-Автор: {data.get('author')}
+Название: {music_info[1]}
+Автор: {music_info[2]}
 Жанр: {await name_of_genre(data.get('genre_id'))}
 
 Всё верно? Нажмите /cancel для отмены.""", reply_markup=cc)
-    await state.update_data(file_id=message.audio.file_id, file_unique_id=message.audio.file_unique_id)
+    await state.update_data(file_id=message.audio.file_id, file_unique_id=message.audio.file_unique_id,
+                            duration=message.audio.duration)
     await AddMusic.confirm.set()
 
 
@@ -82,14 +88,16 @@ async def am_yes(call: types.CallbackQuery, state: FSMContext):
     await call.message.edit_reply_markup()
     data = await state.get_data()
     if call.from_user.id in ADMINS:
-        await add_music(name=data.get('name'), author=data.get('author'), genre_id=data.get('genre_id'),
-                        creator_id=await get_user_id_from_tg_id(call.from_user.id), file_id=data.get('file_id'),
-                        file_unique_id=data.get('file_unique_id'), status=True)
+        await add_gener_duration_file_id_to_music(music_id=data.get('music_id'), genre_id=data.get('genre_id'),
+                                                  file_id=data.get('file_id'),
+                                                  file_unique_id=data.get('file_unique_id'),
+                                                  status=True, duration=data.get('duration'))
         await call.message.answer('Музыка добавлена', reply_markup=start_menu)
     else:
-        await add_music(name=data.get('name'), author=data.get('author'), genre_id=data.get('genre_id'),
-                        creator_id=await get_user_id_from_tg_id(call.from_user.id), file_id=data.get('file_id'),
-                        file_unique_id=data.get('file_unique_id'))
+        await add_gener_duration_file_id_to_music(music_id=data.get('music_id'), genre_id=data.get('genre_id'),
+                                                  file_id=data.get('file_id'),
+                                                  file_unique_id=data.get('file_unique_id'),
+                                                  duration=data.get('duration'))
         await call.message.answer('Музыка отправлена на модерацию', reply_markup=start_menu)
     await delete_message(call.message)
     await state.reset_state()

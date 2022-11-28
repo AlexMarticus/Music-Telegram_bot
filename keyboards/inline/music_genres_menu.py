@@ -3,38 +3,37 @@ from aiogram.utils.callback_data import CallbackData
 from emoji.core import emojize
 from utils.db_func import all_genres, get_all_tracks_of_genre
 
-menu_cd = CallbackData('show_menu', 'level', 'genre_id', 'music_id', 'reference_point_tracks', 'name_track',
-                       'author_tr')
+menu_cd = CallbackData('show_menu', 'level', 'genre_id', 'music_id', 'reference_point_tracks', 'flag')
 
 
-def make_callback_data(level, genre_id="0", music_id='0', reference_point_tracks='0', name_track='0', author_tr='0'):
+def make_callback_data(level, genre_id="0", music_id='0', reference_point_tracks='0', flag=False):
     return menu_cd.new(level=level, genre_id=genre_id, music_id=music_id, reference_point_tracks=reference_point_tracks,
-                       name_track=name_track, author_tr=author_tr)
+                       flag=flag)
 
 
 # клавиатура с жанрами
-async def genres_keyboard(search_music=False, name=None, author=None):
+async def genres_keyboard(search_music=False, music_id=None):
     if not search_music:
         CURRENT_LEVEL = 0
         markup = InlineKeyboardMarkup(row_width=1)
         genres = await all_genres()
         for genre in genres:
             button_text = f"{genre[1]}"
-            callback_data = make_callback_data(level=CURRENT_LEVEL + 1, genre_id=genre[0])
+            callback_data = make_callback_data(level=CURRENT_LEVEL + 1, genre_id=genre[0], flag=False)
             markup.insert(
                 InlineKeyboardButton(text=button_text, callback_data=callback_data)
             )
         markup.row(
             InlineKeyboardButton(
-                text="В главное меню",
-                callback_data='main_menu')
+                text="⬅ Назад",
+                callback_data=make_callback_data(level=-1))
         )
     else:
         markup = InlineKeyboardMarkup(row_width=1)
         genres = await all_genres()
         for genre in genres:
             button_text = f"{genre[1]}"
-            callback_data = make_callback_data(level=50, genre_id=genre[0], name_track=name, author_tr=author)
+            callback_data = make_callback_data(level=50, genre_id=genre[0], music_id=music_id)
             markup.insert(
                 InlineKeyboardButton(text=button_text, callback_data=callback_data)
             )
@@ -77,7 +76,7 @@ async def all_tracks_mode(genre_id, reference_point_tracks):
     # CURRENT_LEVEL = 11
     markup = InlineKeyboardMarkup(row_width=1)
     callback_data = make_callback_data(level='11', genre_id=genre_id,
-                                       reference_point_tracks=reference_point_tracks + 10)
+                                       reference_point_tracks=reference_point_tracks + 10, flag=True)
     markup.insert(
         InlineKeyboardButton(text='Ещё треки', callback_data=callback_data),
     )
@@ -100,7 +99,11 @@ async def one_track_mode(genre_id, reference_point_tracks):
     else:
         before = reference_point_tracks + 10
     for track in range(reference_point_tracks, before):
-        button_text = f"{all_tracks[track][1]} — {all_tracks[track][2]}"
+        if all_tracks[track][8] is not None:
+            button_text = f"{all_tracks[track][1]} — {all_tracks[track][2]} ({int(all_tracks[track][8]) // 60}:" \
+                          f"{int(all_tracks[track][8] % 60)})"
+        else:
+            button_text = f"{all_tracks[track][1]} — {all_tracks[track][2]}"
         callback_data = make_callback_data(level=22, music_id=all_tracks[track][0], genre_id=genre_id,
                                            reference_point_tracks=reference_point_tracks)
         markup.row(

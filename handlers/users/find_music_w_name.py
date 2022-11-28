@@ -17,11 +17,11 @@ async def cancel(message: types.Message, state: FSMContext):
 
 
 # отлов нажатия на кнопку в основном меню
-@dp.message_handler(text=emojize(string=":magnifying_glass_tilted_left: Поиск музыки по названию", language='alias'))
-async def find_(message: types.Message):
+@dp.callback_query_handler(text="find_for_name")
+async def find_(call: types.CallbackQuery):
     msg = ":pencil: ***Введите название песни или нажмите /cancel для отмены***"
     msg = emojize(string=msg, language='alias')
-    await message.answer(msg, parse_mode=types.ParseMode.MARKDOWN)
+    await call.message.edit_text(msg, parse_mode=types.ParseMode.MARKDOWN)
     await FindMusic.name.set()
 
 

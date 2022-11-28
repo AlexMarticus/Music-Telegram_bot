@@ -6,20 +6,22 @@ from emoji.core import emojize
 
 from handlers.users.add_music import am_genre
 from handlers.users.main_menu import delete_message
+from handlers.users.type_of_find_music import genres_find
 from keyboards.default.start import start_menu
 from utils.db_func import get_all_tracks_of_genre, name_of_genre, get_music_info, add_music_to_playlist, \
-    get_user_id_from_tg_id, delete_music_from_playlist, check_is_track_added
+    get_user_id_from_tg_id, delete_music_from_playlist, check_is_track_added, add_message_id_for_deletting, \
+    return_all_ids_mes_for_delete, delete_mes_id_from_del_mes
 
 from aiogram import types
 from keyboards.inline.music_genres_menu import menu_cd, genres_keyboard, all_tracks_or_one, add_track, all_tracks_mode, \
     one_track_mode, one_track_in_one_mode, delete_track_from_playlist
-from loader import dp
+from loader import dp, bot
 
 
 # отлов нажатия на кнопку в основном меню
-@dp.message_handler(text=emojize(string=":magnifying_glass_tilted_left: Поиск музыки по жанрам", language='alias'))
-async def genres_(message: types.Message):
-    await list_genres(message)
+@dp.callback_query_handler(text="find_for_genre")
+async def genres_(call: types.CallbackQuery):
+    await list_genres(call)
 
 
 # возвращает список жанров
@@ -35,13 +37,12 @@ async def list_genres(message: Union[CallbackQuery, Message], **kwargs):
 # кнопки выбора: все треки за раз вывести или по одному
 async def all_or_one_track(call: types.CallbackQuery, genre_id, **kwargs):
     markup = await all_tracks_or_one(genre_id)
-    await call.message.edit_text('"Слушать треки" позволит Вам увидеть весь плейлист из данного жанра и прослушать его.'
-                                 '\n"Добавить треки" позволит удобно переключатся от одного терка к другому '
-                                 'и добавлять их к себе в плейлист', reply_markup=markup)
+    await call.message.edit_text('Выберите действие', reply_markup=markup)
 
 
 # если выбрали все треки за раз
-async def all_tracks_of_genre(call: types.CallbackQuery, genre_id, reference_point_tracks=0, lvl=None, **kwargs):
+async def all_tracks_of_genre(call: types.CallbackQuery, genre_id, reference_point_tracks=0, lvl=None,
+                              flag=False, **kwargs):
     await delete_message(call.message)
     all_tracks = await get_all_tracks_of_genre(genre_id)
     all_tracks = all_tracks[::-1]
@@ -50,21 +51,26 @@ async def all_tracks_of_genre(call: types.CallbackQuery, genre_id, reference_poi
     else:
         before = reference_point_tracks + 10
     for track in range(reference_point_tracks, before):
-        message_text = f"***Название:*** `{all_tracks[track][1]}`\n" \
-                       f"***Исполнитель:*** `{all_tracks[track][2]}`\n" \
-                       f"***Жанр:*** `{await name_of_genre(all_tracks[track][3])}`\n" \
-                       f"***Музыка без интернета:*** https://t.me/pmusicamusik"
+        message_text = f"""***Название:*** `{all_tracks[track][1].replace('`', "'")}`
+***Исполнитель:*** `{all_tracks[track][2].replace('`', "'")}`
+***Жанр:*** `{(await name_of_genre(all_tracks[track][3])).replace('`', "'")}`
+***Музыка без интернета:*** https://t.me/pmusicamusik"""
         if await check_is_track_added(music_id=all_tracks[track][0],
                                       user_id=await get_user_id_from_tg_id(call.from_user.id)):
-            await call.message.answer_audio(audio=all_tracks[track][4],
-                                            reply_markup=
-                                            (await delete_track_from_playlist(music_id=all_tracks[track][0], lvl=lvl)),
-                                            caption=message_text,
-                                            parse_mode=types.ParseMode.MARKDOWN)
+            mes_id = await call.message.answer_audio(audio=all_tracks[track][4],
+                                                     reply_markup=
+                                                     (await delete_track_from_playlist(music_id=all_tracks[track][0],
+                                                                                       lvl=lvl)),
+                                                     caption=message_text,
+                                                     parse_mode=types.ParseMode.MARKDOWN)
         else:
-            await call.message.answer_audio(audio=all_tracks[track][4],
-                                            reply_markup=(await add_track(all_tracks[track][0])), caption=message_text,
-                                            parse_mode=types.ParseMode.MARKDOWN)
+            mes_id = await call.message.answer_audio(audio=all_tracks[track][4],
+                                                     reply_markup=(await add_track(all_tracks[track][0])),
+                                                     caption=message_text,
+                                                     parse_mode=types.ParseMode.MARKDOWN)
+        # добавление message id в БД для удаления сообщений в будущем
+        await add_message_id_for_deletting(message_id=mes_id.message_id,
+                                           user_id=await get_user_id_from_tg_id(call.from_user.id))
     if reference_point_tracks + 10 < len(all_tracks):
         await call.message.answer(text='Для просмотра других треков нажмите "Ещё треки"',
                                   reply_markup=(await all_tracks_mode(genre_id=genre_id,
@@ -126,15 +132,20 @@ async def del_from_playlist(call: types.CallbackQuery, lvl, music_id, genre_id=N
         await call.message.edit_reply_markup(markup)
 
 
+async def back_to_types_searching_music(call: types.CallbackQuery, **kwargs):
+    await delete_message(call.message)
+    await genres_find(call.message)
+
+
 @dp.callback_query_handler(menu_cd.filter())
 async def navigate(call: CallbackQuery, callback_data: dict, state=None):
     current_level = callback_data.get("level")
     genre_id = int(callback_data.get("genre_id"))
     music_id = int(callback_data.get("music_id"))
     reference_point_tracks = int(callback_data.get("reference_point_tracks"))
-    author_tr = callback_data.get("author_tr")
-    name_track = callback_data.get("name_track")
+    flag = callback_data.get("flag")
     levels = {
+        '-1': back_to_types_searching_music,
         "0": list_genres,
         "1": all_or_one_track,
         "11": all_tracks_of_genre,
@@ -154,6 +165,5 @@ async def navigate(call: CallbackQuery, callback_data: dict, state=None):
         music_id=music_id,
         state=state,
         reference_point_tracks=reference_point_tracks,
-        author_tr=author_tr,
-        name_track=name_track
+        flag=flag
     )

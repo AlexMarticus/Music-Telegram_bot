@@ -32,7 +32,7 @@ async def genres_(message: types.Message):
                 [types.InlineKeyboardButton(text='Удалить', callback_data='del_gen')]
             ]
         )
-        await message.answer('Казнить нельзя помиловать', reply_markup=cc)
+        await message.answer('Выберите действие', reply_markup=cc)
 
 
 @dp.callback_query_handler(text='add_gen')

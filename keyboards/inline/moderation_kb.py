@@ -1,7 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.callback_data import CallbackData
 from emoji.core import emojize
-from utils.db_func import all_genres, get_all_tracks_of_genre
 
 menu_mod = CallbackData('show_mod', 'level', 'music_id')
 
