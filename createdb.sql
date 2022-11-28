@@ -57,17 +57,3 @@ CREATE TABLE user_playlist
 	CONSTRAINT FK_user_music FOREIGN KEY(user_id) REFERENCES users(id),
 	CONSTRAINT FK_music_music FOREIGN KEY(music_id) REFERENCES music(id)
 );
-
-
-INSERT INTO genre(name) VALUES ('Dance / Electronic / House');
-INSERT INTO genre(name) VALUES ('Euro Top Hits 🎧');
-INSERT INTO genre(name) VALUES ('Rap / Hip-Hop / R&B');
-
-INSERT INTO genre(name) VALUES ('Remix ▶️');
-INSERT INTO genre(name) VALUES ('Rock music 🎸');
-INSERT INTO genre(name) VALUES ('Russian Hits 🎧');
-
-INSERT INTO genre(name) VALUES ('Trend music ⏯');
-INSERT INTO genre(name) VALUES ('Chill-out ⏸');
-INSERT INTO genre(name) VALUES ('80’s 90’s 00’s Hits');
-INSERT INTO genre(name) VALUES ('Шансон | Романс | Авторская песня');
